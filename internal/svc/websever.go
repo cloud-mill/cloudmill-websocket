@@ -10,7 +10,7 @@ import (
 )
 
 func StartCloudmillWebsocket() {
-	r := NewRouter(server.AuthMiddleware, server.ApiKeyMiddleware)
+	r := NewRouter(server.AuthMiddleware)
 	http.Handle("/", r)
 
 	err := http.ListenAndServe(":"+strconv.Itoa(config.Config.Port), nil)
