@@ -2,16 +2,15 @@ package svc
 
 import (
 	"github.com/cloud-mill/cloudmill-websocket/internal/config"
-	"github.com/cloud-mill/cm-common-golang/models"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"net/http"
 	"strings"
 )
 
-type AuthMiddleware func(next http.Handler, secretKey interface{}, authConfig models.AuthConfig) http.Handler
-
-func NewRouter(authMiddleware AuthMiddleware) *mux.Router {
+func NewRouter(
+	authMiddleware func(next http.Handler, secretKey interface{}, authConfig AuthConfig) http.Handler,
+) *mux.Router {
 
 	// CORS config
 	c := cors.New(cors.Options{
@@ -31,7 +30,7 @@ func NewRouter(authMiddleware AuthMiddleware) *mux.Router {
 			Handler(route.HandlerFunc)
 	}
 
-	authConfig := models.AuthConfig{
+	authConfig := AuthConfig{
 		JwtCookieName:  config.Config.Auth.JwtCookieName,
 		CsrfCookieName: config.Config.Auth.CsrfCookieName,
 		CsrfHeaderName: config.Config.Auth.CsrfHeaderName,
