@@ -31,7 +31,7 @@ func (c *Client) Read() {
 
 	for {
 		c.readMu.Lock()
-		_, _, err := c.Conn.ReadMessage() // TODO: do stuff about received message
+		messageType, message, err := c.Conn.ReadMessage()
 		c.readMu.Unlock()
 		if err != nil {
 			logger.Logger.Debug(
@@ -40,6 +40,15 @@ func (c *Client) Read() {
 				zap.Error(err),
 			)
 			return
+		}
+
+		err = c.HandleMessage(messageType, message)
+		if err != nil {
+			logger.Logger.Error(
+				"error handling message",
+				zap.String("clientId", c.Id),
+				zap.Error(err),
+			)
 		}
 	}
 }
@@ -72,4 +81,16 @@ func NewClient(
 		Conn:       conn,
 		ClientPool: ClientPool,
 	}
+}
+
+func (c *Client) HandleMessage(messageType int, message []byte) error {
+	logger.Logger.Info(
+		"client received message",
+		zap.Int("type", messageType),
+		zap.ByteString("message", message),
+	)
+
+	// TODO: do stuff about received message
+
+	return nil
 }
