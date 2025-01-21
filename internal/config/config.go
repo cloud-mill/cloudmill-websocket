@@ -2,11 +2,12 @@ package config
 
 import (
 	"flag"
+	"strings"
+
 	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"strings"
 )
 
 var Config CloudmillWebsocketConfig
