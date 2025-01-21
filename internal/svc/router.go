@@ -1,11 +1,12 @@
 package svc
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/cloud-mill/cloudmill-websocket/internal/config"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"net/http"
-	"strings"
 )
 
 func NewRouter(

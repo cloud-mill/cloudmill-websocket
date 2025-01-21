@@ -1,9 +1,9 @@
 package models
 
 import (
-	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"sync"
 
+	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -26,11 +26,11 @@ func (cp *ClientPool) Start() error {
 	for {
 		select {
 		case client := <-cp.Register:
-			logger.Logger.Info("registering client", zap.String("clientId", client.Id))
+			logger.Logger.Info("registering client", zap.String("client_id", client.Id))
 			cp.SetClient(client.Id, client)
-			break
+
 		case client := <-cp.Unregister:
-			logger.Logger.Info("unregistering client", zap.String("clientId", client.Id))
+			logger.Logger.Info("unregistering client", zap.String("client_id", client.Id))
 			cp.DeleteClient(client.Id)
 		}
 	}
@@ -40,10 +40,7 @@ func (cp *ClientPool) GetClient(clientId string) *Client {
 	cp.rwMutex.RLock()
 	defer cp.rwMutex.RUnlock()
 
-	if client, ok := cp.Clients[clientId]; ok {
-		return client
-	}
-	return nil
+	return cp.Clients[clientId]
 }
 
 func (cp *ClientPool) SetClient(clientId string, client *Client) {
@@ -61,11 +58,8 @@ func (cp *ClientPool) DeleteClient(clientId string) {
 }
 
 func (cp *ClientPool) SendMessageToClient(clientId string, message Message) {
-	cp.rwMutex.RLock()
-	client, ok := cp.Clients[clientId]
-	cp.rwMutex.RUnlock()
-
-	if ok && client != nil {
+	client := cp.GetClient(clientId)
+	if client != nil {
 		processedMessage := ProcessedMessage{
 			Id:        message.Id,
 			Type:      message.Type,
@@ -80,10 +74,11 @@ func (cp *ClientPool) ClientExitFromPool(clientId string) {
 	client := cp.GetClient(clientId)
 	if client != nil {
 		cp.Unregister <- client
-		if err := client.Conn.Close(); err != nil {
-			logger.Logger.Info(
-				"failed to close client connection",
-				zap.String("clientId", client.Id),
+
+		if err := client.Session.Close(); err != nil {
+			logger.Logger.Error(
+				"failed to close client session",
+				zap.String("client_id", client.Id),
 				zap.Error(err),
 			)
 		}

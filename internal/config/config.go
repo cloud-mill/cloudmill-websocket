@@ -2,16 +2,18 @@ package config
 
 import (
 	"flag"
+	"strings"
+
 	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"strings"
 )
 
-var Config CloudmillWebsocketConfig
-
-var InstanceId string
+var (
+	Config     CloudmillWebsocketConfig
+	InstanceId string
+)
 
 type AuthConfig struct {
 	AuthMiddlewareSecretKey string `json:"auth_middleware_secret_key"`
@@ -27,6 +29,16 @@ type CloudmillWebsocketConfig struct {
 	Auth           AuthConfig `json:"auth"`
 }
 
+const (
+	EnvHost                    = "host"
+	EnvPort                    = "port"
+	EnvAllowedOrigins          = "allowed_origins"
+	EnvAuthMiddlewareSecretKey = "auth_middleware_secret_key"
+	EnvJwtCookieName           = "jwt_cookie_name"
+	EnvCsrfCookieName          = "csrf_cookie_name"
+	EnvCsrfHeaderName          = "csrf_header_name"
+)
+
 func bindEnv(key string) {
 	if err := viper.BindEnv(key); err != nil {
 		logger.Logger.Fatal(
@@ -38,49 +50,68 @@ func bindEnv(key string) {
 }
 
 func getEnvAsStringSlice(key string) []string {
-	if value := viper.GetString(key); value != "" {
+	value := viper.GetString(key)
+	if value != "" {
 		return strings.Split(value, ",")
 	}
 	return nil
+}
+
+func validateConfig() {
+	requiredKeys := []string{
+		EnvHost,
+		EnvPort,
+		EnvAuthMiddlewareSecretKey,
+		EnvJwtCookieName,
+		EnvCsrfCookieName,
+		EnvCsrfHeaderName,
+	}
+
+	for _, key := range requiredKeys {
+		if !viper.IsSet(key) {
+			logger.Logger.Warn("missing required environment variable", zap.String("key", key))
+		}
+	}
 }
 
 func init() {
 	profile := flag.String(
 		"profile",
 		"local",
-		"Environment profile, something similar to spring profiles",
+		"environment profile (e.g., local, dev, prod)",
 	)
 	flag.Parse()
 
-	logger.Logger.Info("profile at", zap.String("profile", *profile))
+	logger.Logger.Info("environment profile", zap.String("profile", *profile))
 
 	viper.SetDefault("profile", *profile)
+	viper.SetEnvPrefix("cm")
 	viper.AutomaticEnv()
 
-	viper.SetEnvPrefix("cm")
+	bindEnv(EnvHost)
+	bindEnv(EnvPort)
+	bindEnv(EnvAllowedOrigins)
+	bindEnv(EnvAuthMiddlewareSecretKey)
+	bindEnv(EnvJwtCookieName)
+	bindEnv(EnvCsrfCookieName)
+	bindEnv(EnvCsrfHeaderName)
 
-	bindEnv("host")
-	bindEnv("port")
-	bindEnv("allowed_origins")
-	bindEnv("auth_middleware_secret_key")
-	bindEnv("jwt_cookie_name")
-	bindEnv("csrf_cookie_name")
-	bindEnv("csrf_header_name")
+	validateConfig()
 
 	Config = CloudmillWebsocketConfig{
-		Host:           viper.GetString("host"),
-		Port:           viper.GetInt("port"),
-		AllowedOrigins: getEnvAsStringSlice("allowed_origins"),
+		Host:           viper.GetString(EnvHost),
+		Port:           viper.GetInt(EnvPort),
+		AllowedOrigins: getEnvAsStringSlice(EnvAllowedOrigins),
 		Auth: AuthConfig{
-			AuthMiddlewareSecretKey: viper.GetString("auth_middleware_secret_key"),
-			JwtCookieName:           viper.GetString("jwt_cookie_name"),
-			CsrfCookieName:          viper.GetString("csrf_cookie_name"),
-			CsrfHeaderName:          viper.GetString("csrf_header_name"),
+			AuthMiddlewareSecretKey: viper.GetString(EnvAuthMiddlewareSecretKey),
+			JwtCookieName:           viper.GetString(EnvJwtCookieName),
+			CsrfCookieName:          viper.GetString(EnvCsrfCookieName),
+			CsrfHeaderName:          viper.GetString(EnvCsrfHeaderName),
 		},
 	}
 
-	logger.Logger.Info("got config", zap.Any("CloudmillWebsocketConfig", Config))
+	logger.Logger.Info("loaded config", zap.Any("Config", Config))
 
 	InstanceId = uuid.New().String()
-	logger.Logger.Info("instance id", zap.String("InstanceId", InstanceId))
+	logger.Logger.Info("initialised instance", zap.String("instance_id", InstanceId))
 }

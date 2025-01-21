@@ -1,66 +1,47 @@
 package models
 
 import (
-	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
-	"sync"
+	"encoding/json"
 
-	"github.com/gorilla/websocket"
+	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
+	"github.com/olahol/melody"
 	"go.uber.org/zap"
 )
 
 type Client struct {
 	Id         string
-	Conn       *websocket.Conn
+	Session    *melody.Session
 	ClientPool *ClientPool
-	writeMu    sync.Mutex
-	readMu     sync.Mutex
 }
 
-func (c *Client) Read() {
-	defer func() {
-		c.ClientPool.Unregister <- c
-		err := c.Conn.Close()
-		if err != nil {
-			logger.Logger.Info(
-				"failed to close client connection",
-				zap.String("clientId", c.Id),
-				zap.Error(err),
-			)
-		}
-	}()
-
-	for {
-		c.readMu.Lock()
-		messageType, message, err := c.Conn.ReadMessage()
-		c.readMu.Unlock()
-		if err != nil {
-			logger.Logger.Debug(
-				"client connection error reading message",
-				zap.String("clientId", c.Id),
-				zap.Error(err),
-			)
-			return
-		}
-
-		err = c.HandleMessage(messageType, message)
-		if err != nil {
-			logger.Logger.Error(
-				"error handling message",
-				zap.String("clientId", c.Id),
-				zap.Error(err),
-			)
-		}
+func NewClient(
+	clientId string,
+	session *melody.Session,
+	clientPool *ClientPool,
+) *Client {
+	logger.Logger.Info("new client", zap.String("clientId", clientId))
+	return &Client{
+		Id:         clientId,
+		Session:    session,
+		ClientPool: clientPool,
 	}
 }
 
 func (c *Client) Write(message ProcessedMessage) {
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		logger.Logger.Error(
+			"failed to encode message to JSON",
+			zap.String("client_id", c.Id),
+			zap.Error(err),
+		)
+		return
+	}
 
-	if err := c.Conn.WriteJSON(message); err != nil {
+	if err := c.Session.Write(messageBytes); err != nil {
 		logger.Logger.Error(
 			"failed to write message to client",
-			zap.String("clientId", c.Id),
+			zap.String("client_id", c.Id),
 			zap.Error(err),
 		)
 	}
@@ -68,29 +49,16 @@ func (c *Client) Write(message ProcessedMessage) {
 
 func (c *Client) Leave() {
 	c.ClientPool.Unregister <- c
+	logger.Logger.Info("client left the pool", zap.String("client_id", c.Id))
 }
 
-func NewClient(
-	clientId string,
-	conn *websocket.Conn,
-	ClientPool *ClientPool,
-) *Client {
-	logger.Logger.Info("creating client", zap.String("clientId", clientId))
-	return &Client{
-		Id:         clientId,
-		Conn:       conn,
-		ClientPool: ClientPool,
-	}
-}
-
-func (c *Client) HandleMessage(messageType int, message []byte) error {
+func (c *Client) HandleMessage(message []byte) error {
 	logger.Logger.Info(
 		"client received message",
-		zap.Int("type", messageType),
+		zap.String("clientId", c.Id),
 		zap.ByteString("message", message),
 	)
 
-	// TODO: do stuff about received message
-
+	// TODO: do stuff about message
 	return nil
 }

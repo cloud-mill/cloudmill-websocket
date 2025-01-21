@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"net/http"
+
 	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 func WriteJSONResponse(w http.ResponseWriter, status int, data []byte) {

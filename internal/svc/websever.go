@@ -1,22 +1,43 @@
 package svc
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"time"
+
 	"github.com/cloud-mill/cloudmill-websocket/internal/config"
 	"github.com/cloud-mill/cloudmill-websocket/internal/logger"
 	"go.uber.org/zap"
-	"net/http"
-	"strconv"
 )
 
 func StartCloudmillWebsocket() {
-	r := NewRouter(AuthMiddleware)
-	http.Handle("/", r)
-
-	err := http.ListenAndServe(":"+strconv.Itoa(config.Config.Port), nil)
-
-	if err != nil {
-		logger.Logger.Panic("error starting web server", zap.Error(err))
+	router := NewRouter(AuthMiddleware)
+	server := &http.Server{
+		Addr:    ":" + strconv.Itoa(config.Config.Port),
+		Handler: router,
 	}
 
-	logger.Logger.Info("CloudmillWebsocket is ready.")
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+
+	go func() {
+		logger.Logger.Info("starting server", zap.String("address", server.Addr))
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Logger.Panic("error starting server", zap.Error(err))
+		}
+	}()
+
+	<-stop
+	logger.Logger.Info("shutting down...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Logger.Error("error during server shutdown", zap.Error(err))
+	}
+	logger.Logger.Info("server stopped")
 }
