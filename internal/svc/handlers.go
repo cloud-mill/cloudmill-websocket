@@ -43,6 +43,8 @@ func init() {
 		}
 		ClientPool.Register <- client
 
+		s.Set("client_id", clientId)
+
 		logger.Logger.Info("client connected", zap.String("client_id", clientId))
 	})
 
